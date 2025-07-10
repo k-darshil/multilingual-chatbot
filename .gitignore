@@ -15,6 +15,9 @@ env.bak/
 venv.bak/
 .env
 
+# Project specific virtual environments
+env-chatbot/
+
 # Distribution / packaging
 .Python
 build/
