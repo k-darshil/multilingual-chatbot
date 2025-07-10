@@ -146,6 +146,21 @@ def display_sidebar():
             st.write(f"**Size:** {doc.get('file_size', 0) / 1024:.1f} KB")
             st.write(f"**Pages:** {doc.get('pages', 'Unknown')}")
             st.write(f"**Words:** {doc.get('word_count', 'Unknown'):,}")
+            
+            # Language information
+            if doc.get('detected_language'):
+                detected_lang_name = st.session_state.translation_service.get_language_name(doc['detected_language'])
+                st.write(f"**Original Language:** {detected_lang_name}")
+            
+            if doc.get('translation_needed'):
+                target_lang_name = st.session_state.translation_service.get_language_name(doc['target_language'])
+                if doc.get('translation_success'):
+                    st.write(f"**Translated to:** {target_lang_name} ✅")
+                else:
+                    st.write(f"**Translation to {target_lang_name}:** Failed ❌")
+                    if doc.get('translation_error'):
+                        st.write(f"*Error: {doc['translation_error'][:50]}...*")
+            
             st.markdown('</div>', unsafe_allow_html=True)
             
             # Clear document button
@@ -187,7 +202,11 @@ def upload_document():
         
         # Process document
         with st.spinner("Processing document..."):
-            result = st.session_state.document_processor.process_file(uploaded_file)
+            result = st.session_state.document_processor.process_file(
+                uploaded_file, 
+                target_language=st.session_state.selected_language,
+                translation_service=st.session_state.translation_service
+            )
         
         if result["success"]:
             st.session_state.current_document = result

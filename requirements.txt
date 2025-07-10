@@ -9,8 +9,7 @@ docling==2.40.0
 easyocr==1.7.2
 
 # Translation Services
-deep-translator==1.11.4
-googletrans==4.0.0rc1
+google-cloud-translate==3.21.1
 
 # AI/ML and OpenAI
 openai==1.93.3

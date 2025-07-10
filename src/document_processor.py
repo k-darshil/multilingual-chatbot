@@ -36,15 +36,17 @@ class DocumentProcessor:
                 st.warning(f"Could not initialize DocLing: {e}")
                 self.converter = None
     
-    def process_file(self, uploaded_file) -> Dict[str, Any]:
+    def process_file(self, uploaded_file, target_language: str = 'en', translation_service=None) -> Dict[str, Any]:
         """
-        Process an uploaded file and extract text content.
+        Process an uploaded file and extract text content with language detection and translation.
         
         Args:
             uploaded_file: Streamlit UploadedFile object
+            target_language: Target language code for translation (default: 'en')
+            translation_service: TranslationService instance for language operations
             
         Returns:
-            Dict containing extracted text, metadata, and processing info
+            Dict containing extracted text (original and translated), metadata, and processing info
         """
         if uploaded_file is None:
             return {"success": False, "error": "No file uploaded"}
@@ -77,19 +79,72 @@ class DocumentProcessor:
             if not extracted_text.strip():
                 return {"success": False, "error": "No text could be extracted from the document"}
             
-            # Calculate basic metadata
-            word_count = len(extracted_text.split())
-            char_count = len(extracted_text)
+            # Language detection and translation
+            detected_language = None
+            translated_text = extracted_text
+            translation_needed = False
+            translation_success = True
+            translation_error = None
+            
+            if translation_service:
+                try:
+                    # Detect language of extracted text
+                    detected_language = translation_service.detect_language(extracted_text)
+                    st.info(f"🔍 Detected document language: {translation_service.get_language_name(detected_language) if detected_language else 'Unknown'}")
+                    
+                    # Check if translation is needed
+                    if detected_language and detected_language != target_language:
+                        translation_needed = True
+                        st.info(f"🌍 Translating document from {translation_service.get_language_name(detected_language)} to {translation_service.get_language_name(target_language)}")
+                        
+                        print("Translating document from ", detected_language, "to", target_language)
+                        # Translate the text
+                        with st.spinner("Translating document..."):
+                            translation_result = translation_service.translate_text(
+                                extracted_text, 
+                                target_language, 
+                                detected_language,
+                                uploaded_file.name
+                            )
+                        
+                        # print("Translation result", translation_result)
+                        if translation_result["success"]:
+                            translated_text = translation_result["translated_text"]
+                            st.success(f"✅ Document translated successfully using {translation_result.get('method', 'unknown method')}")
+                        else:
+                            translation_success = False
+                            translation_error = translation_result.get("error", "Translation failed")
+                            st.warning(f"⚠️ Translation failed: {translation_error}. Using original text.")
+                            translated_text = extracted_text
+                    else:
+                        st.info(f"ℹ️ No translation needed - document is already in {translation_service.get_language_name(target_language)}")
+                        
+                except Exception as e:
+                    st.warning(f"⚠️ Language processing failed: {e}. Using original text.")
+                    translation_error = str(e)
+                    translation_success = False
+            
+            # Calculate metadata for the final text (translated if successful, original otherwise)
+            final_text = translated_text
+            word_count = len(final_text.split())
+            char_count = len(final_text)
             
             return {
                 "success": True,
-                "text": extracted_text,
+                "text": final_text,  # This will be the translated text for indexing
+                "original_text": extracted_text,  # Keep original for reference
+                "translated_text": translated_text if translation_needed else None,
                 "filename": uploaded_file.name,
                 "file_size": len(file_content),
                 "file_type": file_extension,
                 "word_count": word_count,
                 "char_count": char_count,
-                "pages": self._estimate_pages(extracted_text)
+                "pages": self._estimate_pages(final_text),
+                "detected_language": detected_language,
+                "target_language": target_language,
+                "translation_needed": translation_needed,
+                "translation_success": translation_success,
+                "translation_error": translation_error
             }
             
         except Exception as e:
@@ -98,8 +153,12 @@ class DocumentProcessor:
     def _extract_pdf_text(self, file_content: bytes, filename: str) -> str:
         """Extract text from PDF using multiple methods."""
         
+        print("Docling available: ", DOCLING_AVAILABLE)
+        
+        
         # Try DocLing first if available
         if self.converter and DOCLING_AVAILABLE:
+            print("using docling")
             try:
                 # Save content to temporary file for DocLing
                 with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
@@ -108,13 +167,16 @@ class DocumentProcessor:
                 
                 # Convert with DocLing
                 result = self.converter.convert(tmp_file_path)
+                print("Docling conversion successful")
                 
                 # Clean up temporary file
                 os.unlink(tmp_file_path)
                 
                 # Extract text from DocLing result
                 if hasattr(result, 'document') and hasattr(result.document, 'export_to_text'):
-                    return result.document.export_to_text()
+                    exported_text = result.document.export_to_text()
+                    # print("Docling exported_text: ", exported_text)
+                    return exported_text
                 
             except Exception as e:
                 st.warning(f"DocLing extraction failed: {e}. Trying fallback methods.")

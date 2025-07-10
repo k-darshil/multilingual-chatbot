@@ -34,3 +34,8 @@ Thumbs.db
 
 # Neo4j
 neo4j/ 
+
+# Translation cache
+cache/
+
+starry-academy-465514-j2-37ff80cd986b.json

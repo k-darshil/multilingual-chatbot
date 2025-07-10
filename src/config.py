@@ -17,6 +17,7 @@ class Config:
     # API Keys
     OPENAI_API_KEY: str = ""
     GOOGLE_TRANSLATE_API_KEY: Optional[str] = None
+    GOOGLE_PROJECT_ID: Optional[str] = None
     IBM_DOCLING_API_KEY: Optional[str] = None
     HUGGINGFACE_API_KEY: Optional[str] = None
     
@@ -62,6 +63,7 @@ class Config:
             # Try to load from Streamlit secrets first
             cls.OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", "")
             cls.GOOGLE_TRANSLATE_API_KEY = st.secrets.get("GOOGLE_TRANSLATE_API_KEY")
+            cls.GOOGLE_PROJECT_ID = st.secrets.get("GOOGLE_PROJECT_ID")
             cls.IBM_DOCLING_API_KEY = st.secrets.get("IBM_DOCLING_API_KEY")
             cls.HUGGINGFACE_API_KEY = st.secrets.get("HUGGINGFACE_API_KEY")
             
@@ -73,6 +75,7 @@ class Config:
             # Fall back to environment variables
             cls.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
             cls.GOOGLE_TRANSLATE_API_KEY = os.getenv("GOOGLE_TRANSLATE_API_KEY")
+            cls.GOOGLE_PROJECT_ID = os.getenv("GOOGLE_PROJECT_ID")
             cls.IBM_DOCLING_API_KEY = os.getenv("IBM_DOCLING_API_KEY")
             cls.HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
             
