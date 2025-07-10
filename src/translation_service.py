@@ -3,7 +3,7 @@ Translation service module for multilingual document chatbot.
 Supports Google Translate API with fallback to free translation services.
 """
 
-import streamlit as st
+# import streamlit as st  # Removed for Gradio compatibility
 from typing import Optional, Dict, Any, List
 from google.cloud import translate_v3 as translate
 import langdetect

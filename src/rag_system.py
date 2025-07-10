@@ -3,7 +3,7 @@ RAG (Retrieval-Augmented Generation) system for the multilingual document chatbo
 Handles document indexing, retrieval, and answer generation using OpenAI and vector databases.
 """
 
-import streamlit as st
+# import streamlit as st  # Removed for Gradio compatibility
 import openai
 from typing import List, Dict, Any, Optional, Tuple
 import numpy as np

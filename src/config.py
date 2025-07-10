@@ -4,7 +4,7 @@ Handles API keys, settings, and environment variables.
 """
 
 import os
-import streamlit as st
+# import streamlit as st  # Removed for Gradio compatibility
 from typing import Optional
 from dotenv import load_dotenv
 
