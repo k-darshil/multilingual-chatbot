@@ -345,7 +345,7 @@ def main():
     
     # Footer
     st.markdown("---")
-    st.markdown("*Built with Streamlit, OpenAI, and ❤️ for multilingual document understanding*")
+    st.markdown("*Multilingual Document Understanding*")
 
 if __name__ == "__main__":
     main() 

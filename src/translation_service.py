@@ -6,7 +6,7 @@ Supports Google Translate API with fallback to free translation services.
 import streamlit as st
 from typing import Optional, Dict, Any, List
 from deep_translator import GoogleTranslator
-from googletrans import Translator as GoogleTranslatorAPI
+# from googletrans import Translator as GoogleTranslatorAPI  # Commented out due to httpcore compatibility issues
 import langdetect
 from src.config import Config
 
@@ -16,14 +16,15 @@ class TranslationService:
     def __init__(self):
         self.api_translator = None
         self.free_translator = GoogleTranslator()
-        self.fallback_translator = GoogleTranslatorAPI()
+        self.fallback_translator = None  # Disabled due to compatibility issues
         
         # Initialize API translator if key is available
         if Config.GOOGLE_TRANSLATE_API_KEY:
             try:
                 # Note: For Google Cloud Translation API, you'd initialize it here
                 # This is a placeholder for the actual API initialization
-                self.api_translator = GoogleTranslatorAPI()
+                # self.api_translator = GoogleTranslatorAPI()  # Disabled for now
+                pass
             except Exception as e:
                 st.warning(f"Could not initialize Google Translate API: {e}")
     
@@ -71,11 +72,11 @@ class TranslationService:
                 "method": "no_translation_needed"
             }
         
-        # Try different translation methods
+        # Try different translation methods (googletrans disabled due to compatibility issues)
         translation_methods = [
             ("google_api", self._translate_with_api),
             ("google_free", self._translate_with_free_google),
-            ("googletrans", self._translate_with_googletrans)
+            # ("googletrans", self._translate_with_googletrans)  # Disabled for now
         ]
         
         for method_name, method_func in translation_methods:

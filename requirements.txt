@@ -1,50 +1,55 @@
 # Core Web Framework
-streamlit==1.31.0
+streamlit==1.46.1
 
 # Document Processing
 PyPDF2==3.0.1
-pdfplumber==0.10.0
-python-docx==1.1.0
+pdfplumber==0.11.7
+python-docx==1.2.0
+docling==2.40.0
+easyocr==1.7.2
 
-# Translation Services (updated for compatibility)
+# Translation Services
 deep-translator==1.11.4
+googletrans==4.0.0rc1
 
-# AI/ML and OpenAI (updated versions)
-openai==1.12.0
-langchain==0.1.8
-langchain-openai==0.0.6
-langchain-community==0.0.25
+# AI/ML and OpenAI
+openai==1.93.3
+langchain==0.3.26
+langchain-openai==0.3.27
+langchain-community==0.3.27
+langchain-core==0.3.68
+langchain-text-splitters==0.3.8
 
 # Vector Databases and Embeddings
-chromadb==0.4.22
-sentence-transformers==2.3.1
-faiss-cpu==1.8.0
+chromadb==1.0.15
+sentence-transformers==5.0.0
+faiss-cpu==1.11.0
 
 # RAG and Text Processing
-tiktoken==0.5.2
-beautifulsoup4==4.12.3
-nltk==3.8.1
+tiktoken==0.9.0
+beautifulsoup4==4.13.4
+nltk==3.9.1
 langdetect==1.0.9
 
 # API and HTTP
-requests==2.31.0
-aiohttp==3.9.3
+requests==2.32.4
+aiohttp  # Will be installed as dependency
 
-# Data Processing (Python 3.8 compatible versions)
-pandas==1.5.3
-numpy==1.24.4
+# Data Processing
+pandas==2.3.1
+numpy==2.2.6
 
 # Configuration and Environment
-python-dotenv==1.0.1
-pydantic==2.6.1
+python-dotenv==1.1.1
+pydantic==2.11.7
 
 # Neo4j for Persistent Memory (optional)
-neo4j==5.17.0
+neo4j==5.28.1
 
 # Additional Utilities
-chardet==5.2.0
+chardet==3.0.4
 
 # Development and Testing
-pytest==8.0.1
-black==24.2.0
-flake8==7.0.0 
+pytest==8.4.1
+black==25.1.0
+flake8==7.3.0 
