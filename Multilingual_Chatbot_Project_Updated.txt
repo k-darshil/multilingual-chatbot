@@ -1,0 +1,59 @@
+Project Proposal
+Multilingual Document Chatbot
+By: Viveka Kumar (J01258735)
+Gurman Singh (J01266296)
+Introduction
+As people move across countries and languages, they often face difficulties understanding legal, medical, or other important documents written in a foreign language. These documents contain critical information that can affect health, legal status, or personal rights. This proposal introduces an AI-powered multilingual chatbot that helps users understand such documents by providing clear answers in their own language. This chatbot will use Retrieval-Augmented Generation (RAG) technique.
+1. Societal Problem Being Addressed
+Legal and medical documents are often complex and written in technical language. When these documents are in a language the user doesn’t understand, it creates serious barriers to proper understanding. Immigrants, international patients, or foreign workers may not be able to fully comprehend important forms, agreements, or reports. Mistakes in understanding can lead to wrong decisions or missed opportunities.
+
+While machine translation exists, users still struggle to extract specific answers from long documents. This project aims to build an assistant that simplifies this process and helps users find clear answers to their questions.
+2. Proposed AI-Driven Approach
+The system will be a chatbot that accepts documents in different languages (e.g., English, Spanish) and allows users to ask questions in their preferred language (e.g., Hindi). The chatbot will process the document, translate it, and provide relevant answers.
+Workflow Overview:
+a) Document Upload: Users upload legal or medical PDFs.
+b) Text Extraction: IBM DocLing extracts the document text.
+c) Translation: Google Translate API or custom model translates the text into the user's language.
+d) Query Input: Users submit their questions.
+e) RAG and LLM: OpenAI's models with Retrieval-Augmented Generation retrieve and generate answers.
+f) Response: Answers are shown to the user in their language.
+This chatbot will help users understand complex documents without needing fluency in the original language.
+3. Data Availability or Plan for Synthetic Data
+For development, publicly available legal and medical documents will be used. Sources like Kaggle, government websites, and international organizations will provide sample data.
+
+If needed, synthetic documents will be created to simulate various scenarios and test multilingual performance before using real user data.
+
+To evaluate performance, I plan to use one of the following benchmark datasets:
+- MLQA (Multilingual Question Answering)
+- TyDi QA (Typologically diverse languages)
+- XQUAD (Extension of SQuAD for multilingual QA)
+I am currently in the process of selecting the most suitable dataset from these options.
+
+Metrics used for evaluation will include BLEU/ROUGE scores, EM (Exact Match), and F1 score.
+4. Technical Methods to Be Used
+The solution combines natural language processing and retrieval-based methods with a modular architecture:
+
+- NLP: For translation, understanding, and answering queries.
+- Retrieval-Augmented Generation (RAG): To retrieve information from documents and generate responses.
+- Chatbot UI: Built using Streamlit or Gradio.
+- LangGraph Orchestration Layer: Allows integration of different models, APIs, and tools.
+- Self-hosted Translation Models: Planning to fine-tune models for better legal/medical translation accuracy.
+- Embedding Search (optional): For vector-based retrieval.
+- Persistent Memory: Using Neo4j with LangGraph to retain conversation and document structure.
+- RLHF (in exploration): Reinforcement Learning with Human Feedback for ongoing optimization.
+
+APIs and Tools:
+- IBM DocLing: For converting PDFs to plain text.
+- Google Translate API or custom alternatives.
+- OpenAI LLM API: With vendor flexibility for cost-performance optimization.
+5. Anticipated Impact and Ethical Considerations
+Impact:
+- Helps non-native speakers access important information.
+- Improves understanding of legal and medical documents.
+- Can support sectors like healthcare, immigration, education, and public services.
+
+Ethical Considerations:
+- Accuracy: Answers may not always be perfect. Disclaimers will inform users that the chatbot is not a substitute for professional advice.
+- Privacy: Uploaded documents may contain private information. The system will use secure processing and encryption.
+- Bias: LLMs can reflect training data bias. Answers will be grounded in uploaded documents.
+- Vendor Lock-in: Most current QA systems are tied to providers like OpenAI or Google. This project uses a modular setup to allow flexibility and control.
