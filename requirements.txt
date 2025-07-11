@@ -1,5 +1,5 @@
 # Core Web Framework
-gradio==4.40.0
+gradio==3.48.0
 
 # Document Processing
 PyPDF2==3.0.1

@@ -3,7 +3,7 @@ RAG (Retrieval-Augmented Generation) system for the multilingual document chatbo
 Handles document indexing, retrieval, and answer generation using OpenAI and vector databases.
 """
 
-# import streamlit as st  # Removed for Gradio compatibility
+import gradio as gr
 import openai
 from typing import List, Dict, Any, Optional, Tuple
 import numpy as np
@@ -14,6 +14,20 @@ import uuid
 import tiktoken
 from src.config import Config
 from src.translation_service import TranslationService
+
+def safe_gradio_notification(notification_type: str, message: str):
+    """Safely call Gradio notifications, only if in proper context."""
+    try:
+        if notification_type == "info":
+            gr.Info(message)
+        elif notification_type == "warning":
+            gr.Warning(message)
+        elif notification_type == "error":
+            gr.Error(message)
+    except Exception:
+        # If Gradio context is not available, just skip the notification
+        # The print statement will still work
+        pass
 
 class RAGSystem:
     """RAG system for document question answering with multilingual support."""
@@ -28,16 +42,20 @@ class RAGSystem:
         # Initialize OpenAI client
         if Config.OPENAI_API_KEY:
             try:
-                openai.api_key = Config.OPENAI_API_KEY
-                self.openai_client = openai
+                from openai import OpenAI
+                self.openai_client = OpenAI(api_key=Config.OPENAI_API_KEY)
             except Exception as e:
-                st.error(f"Failed to initialize OpenAI client: {e}")
+                error_msg = f"Failed to initialize OpenAI client: {e}"
+                print(f"Error: {error_msg}")
+                safe_gradio_notification("error", error_msg)
         
         # Initialize embedding model
         try:
             self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
         except Exception as e:
-            st.error(f"Failed to load embedding model: {e}")
+            error_msg = f"Failed to load embedding model: {e}"
+            print(f"Error: {error_msg}")
+            safe_gradio_notification("error", error_msg)
         
         # Initialize ChromaDB
         try:
@@ -50,7 +68,11 @@ class RAGSystem:
                 metadata={"hnsw:space": "cosine"}
             )
         except Exception as e:
-            st.warning(f"Failed to initialize ChromaDB: {e}")
+            warning_msg = f"Failed to initialize ChromaDB: {e}"
+            print(f"Warning: {warning_msg}")
+            safe_gradio_notification("warning", warning_msg)
+            self.chroma_client = None
+            self.collection = None
     
     def index_document(self, document_text: str, document_info: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -100,7 +122,9 @@ class RAGSystem:
                     chunk_ids.append(chunk_id)
                     
                 except Exception as e:
-                    st.warning(f"Failed to process chunk {i}: {e}")
+                    warning_msg = f"Failed to process chunk {i}: {e}"
+                    print(f"Warning: {warning_msg}")
+                    safe_gradio_notification("warning", warning_msg)
                     continue
             
             if not embeddings:
@@ -116,7 +140,9 @@ class RAGSystem:
                         ids=chunk_ids
                     )
                 except Exception as e:
-                    st.warning(f"Failed to store in ChromaDB: {e}")
+                    warning_msg = f"Failed to store in ChromaDB: {e}"
+                    print(f"Warning: {warning_msg}")
+                    safe_gradio_notification("warning", warning_msg)
             
             return {
                 "success": True,
@@ -169,7 +195,9 @@ class RAGSystem:
             return relevant_chunks
             
         except Exception as e:
-            st.warning(f"Retrieval failed: {e}")
+            warning_msg = f"Retrieval failed: {e}"
+            print(f"Warning: {warning_msg}")
+            safe_gradio_notification("warning", warning_msg)
             return []
     
     def generate_answer(self, query: str, context_chunks: List[Dict[str, Any]], 
@@ -196,7 +224,7 @@ class RAGSystem:
             prompt = self._create_prompt(query, context_text, target_language)
             
             # Call OpenAI API
-            response = self.openai_client.ChatCompletion.create(
+            response = self.openai_client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
                     {
@@ -386,8 +414,10 @@ Key guidelines:
                 )
                 return True
         except Exception as e:
-            st.error(f"Failed to clear collection: {e}")
-        return False
+            error_msg = f"Failed to clear collection: {e}"
+            print(f"Error: {error_msg}")
+            safe_gradio_notification("error", error_msg)
+            return False
     
     def count_tokens(self, text: str) -> int:
         """Count tokens in text using tiktoken."""
