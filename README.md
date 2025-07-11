@@ -10,45 +10,181 @@ A powerful AI-powered chatbot that can process documents in multiple languages a
 - 🔍 **Smart Search**: Vector-based document search for accurate responses
 - 💻 **Modern Dark UI**: Beautiful dark-themed interface built with Gradio
 
-## Quick Start
+## Setup
 
-1. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Prerequisites
 
-2. **Set up API keys** (copy `env.example` to `.env` and fill in your keys):
+- **Python**: Version 3.8 or higher
+- **Operating System**: Windows, macOS, or Linux
+- **Memory**: At least 4GB RAM recommended
+- **Storage**: 2GB free space for dependencies
+
+### Step 1: Clone the Repository
+
+```bash
+git clone <repository-url>
+cd chatbot
+```
+
+### Step 2: Create a Virtual Environment (Recommended)
+
+**On Windows:**
+```bash
+python -m venv env-chatbot
+env-chatbot\Scripts\activate
+```
+
+**On macOS/Linux:**
+```bash
+python -m venv env-chatbot
+source env-chatbot/bin/activate
+```
+
+### Step 3: Install Dependencies
+
+```bash
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+> **Note**: Installation may take 5-10 minutes due to machine learning dependencies.
+
+### Step 4: Configure API Keys
+
+1. **Copy the example environment file:**
    ```bash
    cp env.example .env
-   # Edit .env with your API keys
    ```
 
-3. **Run the application:**
-   ```bash
-   python app.py
-   # or use the launcher
-   python run_gradio_app.py
+2. **Edit the `.env` file with your API keys:**
+
+   **Required Configuration:**
+   ```env
+   # OpenAI API Key (REQUIRED for AI features)
+   OPENAI_API_KEY=your_openai_api_key_here
    ```
 
-4. **Open in browser:**
-   - Navigate to `http://localhost:7860`
-   - Upload a document and start asking questions!
+   **Optional Configuration:**
+   ```env
+   # Google Cloud Translation (Optional - for enhanced translation)
+   GOOGLE_PROJECT_ID=your-google-cloud-project-id
+   GOOGLE_TRANSLATE_API_KEY=/path/to/your/service-account-key.json
 
-## Configuration
+   # App Settings
+   APP_DEBUG=False
+   MAX_FILE_SIZE_MB=50
 
-Create a `.env` file or set environment variables:
+   # Gradio Settings
+   GRADIO_SHARE=false  # Set to 'true' for public shareable link
+   ```
 
-```env
-# OpenAI API (required for AI features)
-OPENAI_API_KEY=your_openai_api_key_here
+#### Getting API Keys
 
-# Google Cloud Translation (optional, for translation features)
-GOOGLE_APPLICATION_CREDENTIALS=path/to/your/service-account-key.json
-GOOGLE_CLOUD_PROJECT_ID=your_project_id
+**OpenAI API Key (Required):**
+1. Visit [OpenAI Platform](https://platform.openai.com/)
+2. Create an account or sign in
+3. Go to API Keys section
+4. Create a new API key
+5. Copy and paste it into your `.env` file
 
-# Alternative: Direct API key
-GOOGLE_TRANSLATE_API_KEY=your_google_translate_api_key
+**Google Cloud Translation (Optional):**
+- See `google_cloud_setup.md` for detailed Google Cloud setup instructions
+- This enables enhanced translation features but is not required for basic functionality
+
+### Step 5: Run the Application
+
+**Option 1: Direct launch**
+```bash
+python app.py
 ```
+
+**Option 2: Using the launcher**
+```bash
+python run_gradio_app.py
+```
+
+### Step 6: Access the Application
+
+1. **Open your web browser**
+2. **Navigate to:** `http://localhost:7860`
+3. **Start using the chatbot:**
+   - Upload a document (PDF, DOCX, or TXT)
+   - Ask questions about your document
+   - Enjoy multilingual support!
+
+### Verification
+
+To verify your setup is working correctly:
+
+1. The web interface should load without errors
+2. You should be able to upload a small test document
+3. The system should respond to basic questions
+4. Check the console for any error messages
+
+## Advanced Configuration
+
+### Environment Variables Reference
+
+| Variable | Required | Description | Default |
+|----------|----------|-------------|---------|
+| `OPENAI_API_KEY` | ✅ Yes | OpenAI API key for AI features | None |
+| `GOOGLE_PROJECT_ID` | ⚠️ Optional | Google Cloud project ID | None |
+| `GOOGLE_TRANSLATE_API_KEY` | ⚠️ Optional | Path to Google service account key | None |
+| `APP_DEBUG` | ❌ No | Enable debug mode | False |
+| `MAX_FILE_SIZE_MB` | ❌ No | Maximum file upload size | 50 |
+| `GRADIO_SHARE` | ❌ No | Create public shareable link | false |
+
+### Custom Port Configuration
+
+To run on a different port, modify the launch settings in `app.py` or `run_gradio_app.py`:
+
+```python
+demo.launch(server_port=8080)  # Change to your desired port
+```
+
+## Troubleshooting
+
+### Common Setup Issues
+
+**1. "Module not found" errors:**
+```bash
+# Ensure virtual environment is activated
+# Reinstall requirements
+pip install -r requirements.txt --force-reinstall
+```
+
+**2. "OpenAI API key not set" error:**
+- Verify your `.env` file exists in the project root
+- Check that `OPENAI_API_KEY` is set correctly
+- Ensure no extra spaces or quotes around the key
+
+**3. "Port already in use" error:**
+- Change the port in the launch command
+- Or stop other applications using port 7860
+
+**4. Document processing failures:**
+- Check file format (PDF, DOCX, TXT only)
+- Ensure file size is under 50MB
+- Try with a different document
+
+**5. Translation not working:**
+- Translation features are optional
+- Check Google Cloud credentials if using translation
+- The app works without translation enabled
+
+### Performance Issues
+
+**If the application is running slowly:**
+- Ensure you have at least 4GB RAM available
+- Close other memory-intensive applications
+- Consider using smaller documents for testing
+
+### Getting Help
+
+1. Check the console output for specific error messages
+2. Ensure all prerequisites are met
+3. Verify your API keys are valid
+4. Try with a fresh virtual environment
 
 ## Supported Languages
 

@@ -37,41 +37,15 @@ The Google Cloud Translation API v3 **does not support API key authentication**.
 
 ### 5. Configure Your Application
 
-Choose one of these methods:
-
-#### Method 1: JSON Content in secrets.toml (Recommended for Streamlit)
-
-1. Open the downloaded JSON file
-2. Copy the entire JSON content
-3. Add to your `.streamlit/secrets.toml`:
-
-```toml
-[secrets]
-GOOGLE_TRANSLATE_API_KEY = '{"type": "service_account", "project_id": "your-project-id", "private_key_id": "...", "private_key": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n", "client_email": "...", "client_id": "...", "auth_uri": "https://accounts.google.com/o/oauth2/auth", "token_uri": "https://oauth2.googleapis.com/token"}'
-GOOGLE_PROJECT_ID = "your-project-id"
-```
-
-#### Method 2: JSON File Path
 
 1. Place the JSON file in a secure location
-2. Add to your `.streamlit/secrets.toml`:
-
-```toml
-[secrets]
+2. Add to your `.env` file:
+```
 GOOGLE_TRANSLATE_API_KEY = "/path/to/your/service-account.json"
 GOOGLE_PROJECT_ID = "your-project-id"
 ```
 
-#### Method 3: Application Default Credentials
 
-1. Install Google Cloud CLI: `pip install google-cloud-cli`
-2. Run: `gcloud auth application-default login`
-3. Add to your `.streamlit/secrets.toml`:
-
-```toml
-[secrets]
-GOOGLE_PROJECT_ID = "your-project-id"
-```
 
 ## Security Best Practices
 
@@ -80,27 +54,6 @@ GOOGLE_PROJECT_ID = "your-project-id"
 - **Restrict service account permissions** to only what's needed
 - **Rotate keys regularly** for production environments
 
-## Testing Your Setup
-
-Run the example script to verify everything works:
-
-```bash
-python example_translation_usage.py
-```
-
-## Common Issues
-
-### Error: "API keys are not supported by this API"
-- **Solution**: Use service account authentication instead of API keys
-
-### Error: "The caller does not have permission"
-- **Solution**: Ensure your service account has the "Cloud Translation API User" role
-
-### Error: "Project not found"
-- **Solution**: Double-check your GOOGLE_PROJECT_ID matches your actual project ID
-
-### Error: "Invalid JSON"
-- **Solution**: Ensure JSON is properly escaped in TOML format (use single quotes)
 
 ## Cost Considerations
 
