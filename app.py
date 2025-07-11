@@ -1,11 +1,16 @@
 """
-Main Streamlit application for the Multilingual Document Chatbot.
+Main Gradio application for the Multilingual Document Chatbot.
 Provides a user-friendly interface for document upload, language selection, and Q&A.
 """
 
-import streamlit as st
+import gradio as gr
 import sys
 import os
+from typing import List, Tuple, Optional, Dict, Any
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Add src directory to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
@@ -15,356 +20,383 @@ from src.document_processor import DocumentProcessor
 from src.translation_service import TranslationService
 from src.rag_system import RAGSystem
 
-# Page configuration
-st.set_page_config(
-    page_title="Multilingual Document Chatbot",
-    page_icon="🤖",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# Global state for maintaining session
+class AppState:
+    def __init__(self):
+        self.document_processor = DocumentProcessor()
+        self.translation_service = TranslationService()
+        self.rag_system = RAGSystem()
+        self.chat_history: List[Tuple[str, str]] = []
+        self.current_document: Optional[Dict[str, Any]] = None
+        self.document_indexed: bool = False
+        self.selected_language: str = "en"
 
-# Custom CSS for better styling
-st.markdown("""
-<style>
-    .main-header {
-        text-align: center;
-        color: #FF6B6B;
-        font-size: 3rem;
-        font-weight: bold;
-        margin-bottom: 1rem;
-    }
-    .sub-header {
-        text-align: center;
-        color: #666;
-        font-size: 1.2rem;
-        margin-bottom: 2rem;
-    }
-    .sidebar-content {
-        background-color: #f8f9fa;
-        padding: 1rem;
-        border-radius: 10px;
-        margin: 1rem 0;
-    }
-    .chat-message {
-        padding: 1rem;
-        border-radius: 10px;
-        margin: 0.5rem 0;
-    }
-    .user-message {
-        background-color: #e3f2fd;
-        border-left: 4px solid #2196f3;
-    }
-    .assistant-message {
-        background-color: #f3e5f5;
-        border-left: 4px solid #9c27b0;
-    }
-    .document-info {
-        background-color: #e8f5e8;
-        padding: 1rem;
-        border-radius: 10px;
-        border-left: 4px solid #4caf50;
-        margin: 1rem 0;
-    }
-    .warning-box {
-        background-color: #fff3cd;
-        padding: 1rem;
-        border-radius: 10px;
-        border-left: 4px solid #ffc107;
-        margin: 1rem 0;
-    }
-    .error-box {
-        background-color: #f8d7da;
-        padding: 1rem;
-        border-radius: 10px;
-        border-left: 4px solid #dc3545;
-        margin: 1rem 0;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Initialize global state
+app_state = AppState()
 
-def initialize_session_state():
-    """Initialize session state variables."""
-    if 'document_processor' not in st.session_state:
-        st.session_state.document_processor = DocumentProcessor()
-    
-    if 'translation_service' not in st.session_state:
-        st.session_state.translation_service = TranslationService()
-    
-    if 'rag_system' not in st.session_state:
-        st.session_state.rag_system = RAGSystem()
-    
-    if 'chat_history' not in st.session_state:
-        st.session_state.chat_history = []
-    
-    if 'current_document' not in st.session_state:
-        st.session_state.current_document = None
-    
-    if 'document_indexed' not in st.session_state:
-        st.session_state.document_indexed = False
-
-def display_header():
-    """Display the main header and description."""
-    st.markdown('<h1 class="main-header">🤖 Multilingual Document Chatbot</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Upload documents in any language and ask questions in your preferred language</p>', unsafe_allow_html=True)
-    
-    # Configuration validation
+def validate_configuration():
+    """Validate configuration and return status message."""
     is_valid, errors = Config.validate_config()
     if not is_valid:
-        st.markdown('<div class="error-box">', unsafe_allow_html=True)
-        st.error("Configuration Issues:")
-        for error in errors:
-            st.write(f"❌ {error}")
-        st.write("Please check your API keys in the secrets.toml file or environment variables.")
-        st.markdown('</div>', unsafe_allow_html=True)
-        return False
-    
-    return True
+        error_msg = "❌ Configuration Issues:\n" + "\n".join([f"• {error}" for error in errors])
+        error_msg += "\n\nPlease check your API keys in the .env file."
+        return False, error_msg
+    return True, "✅ Configuration is valid"
 
-def display_sidebar():
-    """Display the sidebar with settings and document info."""
-    with st.sidebar:
-        st.markdown("## ⚙️ Settings")
-        
-        # Language selection
-        st.markdown("### 🌍 Response Language")
-        language_options = Config.get_language_options()
-        selected_language = st.selectbox(
-            "Choose your preferred language:",
-            options=[code for code, name in language_options],
-            format_func=lambda x: next(name for code, name in language_options if code == x),
-            index=0  # Default to English
-        )
-        st.session_state.selected_language = selected_language
-        
-        # Document information
-        if st.session_state.current_document:
-            st.markdown("### 📄 Current Document")
-            st.markdown('<div class="document-info">', unsafe_allow_html=True)
-            doc = st.session_state.current_document
-            st.write(f"**File:** {doc.get('filename', 'Unknown')}")
-            st.write(f"**Type:** {doc.get('file_type', 'Unknown')}")
-            st.write(f"**Size:** {doc.get('file_size', 0) / 1024:.1f} KB")
-            st.write(f"**Pages:** {doc.get('pages', 'Unknown')}")
-            st.write(f"**Words:** {doc.get('word_count', 'Unknown'):,}")
-            
-            # Language information
-            if doc.get('detected_language'):
-                detected_lang_name = st.session_state.translation_service.get_language_name(doc['detected_language'])
-                st.write(f"**Original Language:** {detected_lang_name}")
-            
-            if doc.get('translation_needed'):
-                target_lang_name = st.session_state.translation_service.get_language_name(doc['target_language'])
-                if doc.get('translation_success'):
-                    st.write(f"**Translated to:** {target_lang_name} ✅")
-                else:
-                    st.write(f"**Translation to {target_lang_name}:** Failed ❌")
-                    if doc.get('translation_error'):
-                        st.write(f"*Error: {doc['translation_error'][:50]}...*")
-            
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-            # Clear document button
-            if st.button("🗑️ Clear Document"):
-                st.session_state.current_document = None
-                st.session_state.document_indexed = False
-                st.session_state.chat_history = []
-                if st.session_state.rag_system.clear_collection():
-                    st.success("Document cleared successfully!")
-                st.rerun()
-        
-        # Collection stats
-        if st.session_state.rag_system:
-            stats = st.session_state.rag_system.get_collection_stats()
-            if "total_chunks" in stats:
-                st.markdown("### 📊 Vector Database")
-                st.write(f"**Chunks stored:** {stats['total_chunks']}")
-                st.write(f"**Embedding model:** {stats.get('embedding_model', 'Unknown')}")
+def get_language_options():
+    """Get language options for dropdown."""
+    language_options = Config.get_language_options()
+    return [name for code, name in language_options]
 
-def upload_document():
-    """Handle document upload and processing."""
-    st.markdown("## 📁 Upload Document")
+def update_language(language_name: str) -> str:
+    """Update selected language."""
+    language_map = {name: code for code, name in Config.get_language_options()}
+    app_state.selected_language = language_map.get(language_name, "en")
+    return f"Language set to: {language_name}"
+
+def process_document(uploaded_file):
+    """Process uploaded document."""
+    if uploaded_file is None:
+        return "❌ No file uploaded", "No document loaded", "No document loaded"
     
-    uploaded_file = st.file_uploader(
-        "Choose a document",
-        type=['pdf', 'docx', 'txt', 'doc'],
-        help="Supported formats: PDF, DOCX, TXT, DOC (Max 50MB)"
-    )
-    
-    if uploaded_file is not None:
+    try:
+        # Debug: Check what type of object we received
+        print(f"🔍 Debug: Received file object type: {type(uploaded_file)}")
+        print(f"🔍 Debug: File object attributes: {dir(uploaded_file)}")
+        
+        # Handle different types of file objects from Gradio
+        if hasattr(uploaded_file, 'name'):
+            file_path = uploaded_file.name
+            print(f"🔍 Debug: Using file path from .name: {file_path}")
+        elif isinstance(uploaded_file, str):
+            file_path = uploaded_file
+            print(f"🔍 Debug: File is already a string path: {file_path}")
+        else:
+            # Try to get the file path from common attributes
+            for attr in ['path', 'file', 'filename']:
+                if hasattr(uploaded_file, attr):
+                    file_path = getattr(uploaded_file, attr)
+                    print(f"🔍 Debug: Using file path from .{attr}: {file_path}")
+                    break
+            else:
+                return "❌ Unable to extract file path from uploaded file", "No document loaded", "No document loaded"
+        
+        # Verify the file exists
+        if not os.path.exists(file_path):
+            return f"❌ File not found: {file_path}", "No document loaded", "No document loaded"
+            
+        print(f"📁 Processing file: {file_path}")
+        
+        # Create a mock uploaded file object for compatibility with DocumentProcessor
+        class MockUploadedFile:
+            def __init__(self, file_path):
+                self.name = os.path.basename(file_path)
+                with open(file_path, 'rb') as f:
+                    self.content = f.read()
+                self.size = len(self.content)
+                self._position = 0
+            
+            def read(self):
+                return self.content
+            
+            def seek(self, position):
+                self._position = position
+        
+        mock_file = MockUploadedFile(file_path)
+        print(f"✅ Created mock file object for: {mock_file.name}")
+        
         # Validate file
-        is_valid, error_message = st.session_state.document_processor.validate_file(uploaded_file)
+        print("🔍 Starting file validation...")
+        try:
+            is_valid, error_message = app_state.document_processor.validate_file(mock_file)
+            print(f"✅ File validation completed: {is_valid}")
+        except Exception as e:
+            print(f"❌ File validation failed: {e}")
+            return f"❌ File validation error: {str(e)}", "No document loaded", "No document loaded"
         
         if not is_valid:
-            st.markdown('<div class="error-box">', unsafe_allow_html=True)
-            st.error(f"❌ {error_message}")
-            st.markdown('</div>', unsafe_allow_html=True)
-            return
+            return f"❌ {error_message}", "No document loaded", "No document loaded"
         
         # Process document
-        with st.spinner("Processing document..."):
-            result = st.session_state.document_processor.process_file(
-                uploaded_file, 
-                target_language=st.session_state.selected_language,
-                translation_service=st.session_state.translation_service
+        print("🔍 Starting document processing...")
+        try:
+            result = app_state.document_processor.process_file(
+                mock_file,
+                target_language=app_state.selected_language,
+                translation_service=app_state.translation_service
             )
+            print(f"✅ Document processing completed: {result.get('success', False)}")
+        except Exception as e:
+            print(f"❌ Document processing failed: {e}")
+            return f"❌ Document processing error: {str(e)}", "No document loaded", "No document loaded"
         
         if result["success"]:
-            st.session_state.current_document = result
-            st.markdown('<div class="document-info">', unsafe_allow_html=True)
-            st.success("✅ Document processed successfully!")
-            st.write(f"**Extracted {result['word_count']:,} words** from {result['pages']} page(s)")
-            st.markdown('</div>', unsafe_allow_html=True)
+            app_state.current_document = result
+            print(f"✅ Document stored in app state")
             
             # Index document for RAG
-            with st.spinner("Indexing document for search..."):
-                index_result = st.session_state.rag_system.index_document(
+            print("🔍 Starting RAG indexing...")
+            try:
+                index_result = app_state.rag_system.index_document(
                     result['text'], 
                     result
                 )
+                print(f"✅ RAG indexing completed: {index_result.get('success', False)}")
+            except Exception as e:
+                print(f"❌ RAG indexing failed: {e}")
+                return f"❌ RAG indexing error: {str(e)}", "No document loaded", "No document loaded"
             
             if index_result["success"]:
-                st.session_state.document_indexed = True
-                st.success(f"✅ Document indexed with {index_result['chunks_count']} chunks")
+                app_state.document_indexed = True
+                app_state.chat_history = []  # Clear chat history for new document
+                
+                print("🔍 Creating success message...")
+                try:
+                    success_msg = f"✅ Document processed successfully!\n"
+                    success_msg += f"📄 Extracted {result['word_count']:,} words from {result['pages']} page(s)\n"
+                    success_msg += f"🔍 Indexed with {index_result['chunks_count']} chunks"
+                    
+                    # Document info
+                    doc_info = f"**File:** {result.get('filename', 'Unknown')}\n"
+                    doc_info += f"**Type:** {result.get('file_type', 'Unknown')}\n"
+                    doc_info += f"**Size:** {result.get('file_size', 0) / 1024:.1f} KB\n"
+                    doc_info += f"**Pages:** {result.get('pages', 'Unknown')}\n"
+                    doc_info += f"**Words:** {result.get('word_count', 'Unknown'):,}\n"
+                    
+                    if result.get('detected_language'):
+                        detected_lang_name = app_state.translation_service.get_language_name(result['detected_language'])
+                        doc_info += f"**Original Language:** {detected_lang_name}\n"
+                    
+                    if result.get('translation_needed'):
+                        target_lang_name = app_state.translation_service.get_language_name(result['target_language'])
+                        if result.get('translation_success'):
+                            doc_info += f"**Translated to:** {target_lang_name} ✅\n"
+                        else:
+                            doc_info += f"**Translation to {target_lang_name}:** Failed ❌\n"
+                    
+                    print("✅ Success message created, returning results...")
+                    return success_msg, doc_info, "Ready to answer questions!"
+                    
+                except Exception as e:
+                    print(f"❌ Error creating success message: {e}")
+                    return f"❌ Error creating success message: {str(e)}", "No document loaded", "No document loaded"
             else:
-                st.markdown('<div class="warning-box">', unsafe_allow_html=True)
-                st.warning(f"⚠️ Indexing failed: {index_result.get('error', 'Unknown error')}")
-                st.markdown('</div>', unsafe_allow_html=True)
-        
+                return f"⚠️ Document processed but indexing failed: {index_result.get('error', 'Unknown error')}", "No document loaded", "No document loaded"
         else:
-            st.markdown('<div class="error-box">', unsafe_allow_html=True)
-            st.error(f"❌ Processing failed: {result.get('error', 'Unknown error')}")
-            st.markdown('</div>', unsafe_allow_html=True)
+            return f"❌ Processing failed: {result.get('error', 'Unknown error')}", "No document loaded", "No document loaded"
+                
+    except Exception as e:
+        print(f"❌ Exception in process_document: {str(e)}")
+        print(f"🔍 Debug: Exception type: {type(e)}")
+        import traceback
+        traceback.print_exc()
+        return f"❌ Error processing document: {str(e)}", "No document loaded", "No document loaded"
 
-def display_chat_interface():
-    """Display the chat interface for Q&A."""
-    if not st.session_state.current_document:
-        st.markdown('<div class="warning-box">', unsafe_allow_html=True)
-        st.info("👆 Please upload a document first to start asking questions.")
-        st.markdown('</div>', unsafe_allow_html=True)
-        return
+def clear_document():
+    """Clear current document and reset state."""
+    app_state.current_document = None
+    app_state.document_indexed = False
+    app_state.chat_history = []
+    if app_state.rag_system.clear_collection():
+        return "🗑️ Document cleared successfully!", "No document loaded", "No document loaded"
+    return "❌ Failed to clear document", "No document loaded", "No document loaded"
+
+def chat_with_document(message: str, history: List[Tuple[str, str]]) -> Tuple[List[Tuple[str, str]], str]:
+    """Handle chat interaction with the document."""
+    if not app_state.current_document:
+        new_history = history + [(message, "❌ Please upload a document first.")]
+        return new_history, ""
     
-    st.markdown("## 💬 Ask Questions About Your Document")
+    if not message.strip():
+        return history, ""
     
-    # Display chat history
-    if st.session_state.chat_history:
-        st.markdown("### 📝 Conversation History")
-        for i, (question, answer, metadata) in enumerate(st.session_state.chat_history):
-            # User question
-            st.markdown('<div class="chat-message user-message">', unsafe_allow_html=True)
-            st.markdown(f"**You:** {question}")
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-            # Assistant answer
-            st.markdown('<div class="chat-message assistant-message">', unsafe_allow_html=True)
-            st.markdown(f"**Assistant:** {answer}")
-            
-            # Show metadata if available
-            if metadata and "sources" in metadata:
-                with st.expander("📚 Sources", expanded=False):
-                    for j, source in enumerate(metadata["sources"][:3]):  # Show top 3 sources
-                        st.write(f"**Source {j+1}:** {source.get('filename', 'Unknown')}")
-                        st.write(f"*Similarity: {source.get('similarity_score', 0):.2f}*")
-                        st.write(f"Preview: {source.get('preview', 'No preview')}")
-                        st.write("---")
-            
-            st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Question input
-    question = st.chat_input(
-        "Ask a question about your document...",
-        key="question_input"
-    )
-    
-    if question:
-        # Add user question to chat
-        st.markdown('<div class="chat-message user-message">', unsafe_allow_html=True)
-        st.markdown(f"**You:** {question}")
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Generate answer
-        with st.spinner("Thinking..."):
-            answer_result = st.session_state.rag_system.ask_question(
-                question, 
-                st.session_state.selected_language
-            )
+    try:
+        # Generate answer using RAG system
+        answer_result = app_state.rag_system.ask_question(
+            message, 
+            app_state.selected_language
+        )
         
         if answer_result["success"]:
             answer = answer_result["answer"]
             
-            # Display answer
-            st.markdown('<div class="chat-message assistant-message">', unsafe_allow_html=True)
-            st.markdown(f"**Assistant:** {answer}")
+            # Format sources information
+            sources_info = ""
+            if "sources" in answer_result and answer_result["sources"]:
+                sources_info = "\n\n📚 **Sources:**\n"
+                for i, source in enumerate(answer_result["sources"][:3]):
+                    sources_info += f"**Source {i+1}:** {source.get('filename', 'Unknown')} "
+                    sources_info += f"(Similarity: {source.get('similarity_score', 0):.2f})\n"
+                    sources_info += f"Preview: {source.get('preview', 'No preview')}\n\n"
             
-            # Show sources
-            if "sources" in answer_result:
-                with st.expander("📚 Sources", expanded=False):
-                    for i, source in enumerate(answer_result["sources"][:3]):
-                        st.write(f"**Source {i+1}:** {source.get('filename', 'Unknown')}")
-                        st.write(f"*Similarity: {source.get('similarity_score', 0):.2f}*")
-                        st.write(f"Preview: {source.get('preview', 'No preview')}")
-                        st.write("---")
+            full_answer = answer + sources_info
             
-            st.markdown('</div>', unsafe_allow_html=True)
+            # Add to app state chat history for persistence
+            app_state.chat_history.append((message, full_answer))
             
-            # Add to chat history
-            st.session_state.chat_history.append((question, answer, answer_result))
-        
+            # Return updated history
+            new_history = history + [(message, full_answer)]
+            return new_history, ""
         else:
-            st.markdown('<div class="error-box">', unsafe_allow_html=True)
-            st.error(f"❌ {answer_result.get('error', 'Failed to generate answer')}")
-            st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Rerun to update the interface
-        st.rerun()
+            error_msg = f"❌ {answer_result.get('error', 'Failed to generate answer')}"
+            new_history = history + [(message, error_msg)]
+            return new_history, ""
+            
+    except Exception as e:
+        error_msg = f"❌ Error: {str(e)}"
+        new_history = history + [(message, error_msg)]
+        return new_history, ""
 
-def display_features():
-    """Display feature information."""
-    with st.expander("🚀 Features", expanded=False):
-        col1, col2, col3 = st.columns(3)
+def create_interface():
+    """Create the Gradio interface."""
+    
+    # Simple CSS for styling
+    css = """
+    .gradio-container {
+        font-family: 'Arial', sans-serif;
+    }
+    .main-header {
+        text-align: center;
+        color: #2E86AB;
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 1rem;
+    }
+    """
+    
+    with gr.Blocks(
+        title="Multilingual Document Chatbot",
+        css=css
+    ) as interface:
         
-        with col1:
-            st.markdown("### 📄 Document Processing")
-            st.write("- PDF, DOCX, TXT support")
-            st.write("- Text extraction with multiple fallbacks")
-            st.write("- Document chunking for better search")
+        # Header
+        gr.HTML('<div class="main-header">🤖 Multilingual Document Chatbot</div>')
+        gr.HTML('<div style="text-align: center; margin-bottom: 2rem;">Upload documents in any language and ask questions in your preferred language</div>')
         
-        with col2:
-            st.markdown("### 🌍 Multilingual Support")
-            st.write("- 20+ supported languages")
-            st.write("- Automatic language detection")
-            st.write("- Real-time translation")
+        # Configuration status
+        config_valid, config_msg = validate_configuration()
+        if not config_valid:
+            gr.HTML(f'<div style="background-color: #ffebee; padding: 1rem; border-radius: 8px; border: 1px solid #f44336; margin: 1rem 0; color: #c62828;">{config_msg}</div>')
         
-        with col3:
-            st.markdown("### 🤖 AI-Powered Q&A")
-            st.write("- RAG-based question answering")
-            st.write("- Context-aware responses")
-            st.write("- Source attribution")
+        with gr.Row():
+            # Left column - Document upload and settings
+            with gr.Column(scale=1):
+                gr.HTML('<h3>⚙️ Settings & Document Upload</h3>')
+                
+                # Language selection
+                language_dropdown = gr.Dropdown(
+                    choices=get_language_options(),
+                    value="English",
+                    label="🌍 Response Language"
+                )
+                
+                language_status = gr.Textbox(
+                    value="Language set to: English",
+                    label="Language Status",
+                    interactive=False
+                )
+                
+                # Document upload
+                gr.HTML('<h4>📁 Upload Document</h4>')
+                file_upload = gr.File(
+                    label="Choose a document",
+                    file_types=[".pdf", ".docx", ".txt", ".doc"]
+                )
+                
+                upload_status = gr.Textbox(
+                    label="Upload Status",
+                    interactive=False,
+                    lines=3
+                )
+                
+                # Document info
+                document_info = gr.Textbox(
+                    label="📄 Document Information",
+                    interactive=False,
+                    lines=8,
+                    value="No document loaded"
+                )
+                
+                # Chat status
+                chat_status = gr.Textbox(
+                    label="💬 Chat Status",
+                    interactive=False,
+                    value="No document loaded"
+                )
+                
+                # Clear document button
+                clear_btn = gr.Button("🗑️ Clear Document")
+                
+            # Right column - Chat interface
+            with gr.Column(scale=2):
+                gr.HTML('<h3>💬 Ask Questions About Your Document</h3>')
+                
+                # Chat interface
+                chatbot = gr.Chatbot(
+                    height=500,
+                    label="Conversation"
+                )
+                
+                msg = gr.Textbox(
+                    label="Your Question",
+                    placeholder="Ask a question about your document...",
+                    lines=2
+                )
+                
+                submit_btn = gr.Button("Send", variant="primary")
+                
+        # Event handlers
+        language_dropdown.change(
+            fn=update_language,
+            inputs=[language_dropdown],
+            outputs=[language_status]
+        )
+        
+        file_upload.change(
+            fn=process_document,
+            inputs=[file_upload],
+            outputs=[upload_status, document_info, chat_status]
+        )
+        
+        clear_btn.click(
+            fn=clear_document,
+            outputs=[upload_status, document_info, chat_status]
+        )
+        
+        # Chat event handlers
+        submit_btn.click(
+            fn=chat_with_document,
+            inputs=[msg, chatbot],
+            outputs=[chatbot, msg]
+        )
+        
+        msg.submit(
+            fn=chat_with_document,
+            inputs=[msg, chatbot],
+            outputs=[chatbot, msg]
+        )
+        
+    return interface
 
 def main():
     """Main application function."""
-    # Initialize session state
-    initialize_session_state()
+    interface = create_interface()
     
-    # Display header and check configuration
-    if not display_header():
-        return
+    # Get environment variables with proper defaults
+    share_app = os.getenv("GRADIO_SHARE", "false").lower() in ["true", "1", "yes"]
     
-    # Display sidebar
-    display_sidebar()
+    print(f"🚀 Starting Multilingual Document Chatbot...")
+    print(f"📡 Share mode: {'Enabled' if share_app else 'Disabled'}")
     
-    # Main content area
-    col1, col2 = st.columns([1, 2])
-    
-    with col1:
-        upload_document()
-        display_features()
-    
-    with col2:
-        display_chat_interface()
-    
-    # Footer
-    st.markdown("---")
-    st.markdown("*Multilingual Document Understanding*")
+    # Launch the interface
+    interface.launch(
+        server_name="0.0.0.0" if share_app else "127.0.0.1",
+        server_port=7860,
+        share=share_app,
+        show_error=True,
+        inbrowser=not share_app,  # Don't auto-open browser if sharing publicly
+        debug=True
+    )
 
 if __name__ == "__main__":
     main() 

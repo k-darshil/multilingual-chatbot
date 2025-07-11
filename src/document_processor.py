@@ -7,7 +7,7 @@ import io
 import tempfile
 import os
 from typing import Optional, Dict, Any, List
-import streamlit as st
+# import streamlit as st  # Removed for Gradio compatibility
 import PyPDF2
 import pdfplumber
 from docx import Document
@@ -19,7 +19,7 @@ try:
     DOCLING_AVAILABLE = True
 except ImportError:
     DOCLING_AVAILABLE = False
-    st.warning("DocLing not available. Using fallback PDF extraction methods.")
+    print("DocLing not available. Using fallback PDF extraction methods.")
 
 class DocumentProcessor:
     """Class for processing and extracting text from various document formats."""
@@ -33,7 +33,7 @@ class DocumentProcessor:
             try:
                 self.converter = DocumentConverter()
             except Exception as e:
-                st.warning(f"Could not initialize DocLing: {e}")
+                print(f"Could not initialize DocLing: {e}")
                 self.converter = None
     
     def process_file(self, uploaded_file, target_language: str = 'en', translation_service=None) -> Dict[str, Any]:
@@ -90,37 +90,37 @@ class DocumentProcessor:
                 try:
                     # Detect language of extracted text
                     detected_language = translation_service.detect_language(extracted_text)
-                    st.info(f"🔍 Detected document language: {translation_service.get_language_name(detected_language) if detected_language else 'Unknown'}")
+                    print(f"🔍 Detected document language: {translation_service.get_language_name(detected_language) if detected_language else 'Unknown'}")
                     
                     # Check if translation is needed
                     if detected_language and detected_language != target_language:
                         translation_needed = True
-                        st.info(f"🌍 Translating document from {translation_service.get_language_name(detected_language)} to {translation_service.get_language_name(target_language)}")
+                        print(f"🌍 Translating document from {translation_service.get_language_name(detected_language)} to {translation_service.get_language_name(target_language)}")
                         
                         print("Translating document from ", detected_language, "to", target_language)
                         # Translate the text
-                        with st.spinner("Translating document..."):
-                            translation_result = translation_service.translate_text(
-                                extracted_text, 
-                                target_language, 
-                                detected_language,
-                                uploaded_file.name
-                            )
+                        print("Translating document...")
+                        translation_result = translation_service.translate_text(
+                            extracted_text, 
+                            target_language, 
+                            detected_language,
+                            uploaded_file.name
+                        )
                         
                         # print("Translation result", translation_result)
                         if translation_result["success"]:
                             translated_text = translation_result["translated_text"]
-                            st.success(f"✅ Document translated successfully using {translation_result.get('method', 'unknown method')}")
+                            print(f"✅ Document translated successfully using {translation_result.get('method', 'unknown method')}")
                         else:
                             translation_success = False
                             translation_error = translation_result.get("error", "Translation failed")
-                            st.warning(f"⚠️ Translation failed: {translation_error}. Using original text.")
+                            print(f"⚠️ Translation failed: {translation_error}. Using original text.")
                             translated_text = extracted_text
                     else:
-                        st.info(f"ℹ️ No translation needed - document is already in {translation_service.get_language_name(target_language)}")
+                        print(f"ℹ️ No translation needed - document is already in {translation_service.get_language_name(target_language)}")
                         
                 except Exception as e:
-                    st.warning(f"⚠️ Language processing failed: {e}. Using original text.")
+                    print(f"⚠️ Language processing failed: {e}. Using original text.")
                     translation_error = str(e)
                     translation_success = False
             
@@ -179,7 +179,7 @@ class DocumentProcessor:
                     return exported_text
                 
             except Exception as e:
-                st.warning(f"DocLing extraction failed: {e}. Trying fallback methods.")
+                print(f"DocLing extraction failed: {e}. Trying fallback methods.")
         
         # Fallback to pdfplumber
         try:
@@ -194,7 +194,7 @@ class DocumentProcessor:
                     if text_parts:
                         return '\n\n'.join(text_parts)
         except Exception as e:
-            st.warning(f"pdfplumber extraction failed: {e}. Trying PyPDF2.")
+            print(f"pdfplumber extraction failed: {e}. Trying PyPDF2.")
         
         # Fallback to PyPDF2
         try:

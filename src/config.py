@@ -4,11 +4,10 @@ Handles API keys, settings, and environment variables.
 """
 
 import os
-import streamlit as st
 from typing import Optional
 from dotenv import load_dotenv
 
-# Load environment variables
+# Load environment variables from .env file
 load_dotenv()
 
 class Config:
@@ -58,30 +57,17 @@ class Config:
     
     @classmethod
     def load_config(cls):
-        """Load configuration from environment variables and Streamlit secrets."""
-        try:
-            # Try to load from Streamlit secrets first
-            cls.OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", "")
-            cls.GOOGLE_TRANSLATE_API_KEY = st.secrets.get("GOOGLE_TRANSLATE_API_KEY")
-            cls.GOOGLE_PROJECT_ID = st.secrets.get("GOOGLE_PROJECT_ID")
-            cls.IBM_DOCLING_API_KEY = st.secrets.get("IBM_DOCLING_API_KEY")
-            cls.HUGGINGFACE_API_KEY = st.secrets.get("HUGGINGFACE_API_KEY")
-            
-            cls.NEO4J_URI = st.secrets.get("NEO4J_URI")
-            cls.NEO4J_USERNAME = st.secrets.get("NEO4J_USERNAME")
-            cls.NEO4J_PASSWORD = st.secrets.get("NEO4J_PASSWORD")
-            
-        except Exception:
-            # Fall back to environment variables
-            cls.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-            cls.GOOGLE_TRANSLATE_API_KEY = os.getenv("GOOGLE_TRANSLATE_API_KEY")
-            cls.GOOGLE_PROJECT_ID = os.getenv("GOOGLE_PROJECT_ID")
-            cls.IBM_DOCLING_API_KEY = os.getenv("IBM_DOCLING_API_KEY")
-            cls.HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
-            
-            cls.NEO4J_URI = os.getenv("NEO4J_URI")
-            cls.NEO4J_USERNAME = os.getenv("NEO4J_USERNAME")
-            cls.NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
+        """Load configuration from environment variables and .env file."""
+        # Load from environment variables (which includes .env via dotenv)
+        cls.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+        cls.GOOGLE_TRANSLATE_API_KEY = os.getenv("GOOGLE_TRANSLATE_API_KEY")
+        cls.GOOGLE_PROJECT_ID = os.getenv("GOOGLE_PROJECT_ID")
+        cls.IBM_DOCLING_API_KEY = os.getenv("IBM_DOCLING_API_KEY")
+        cls.HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
+        
+        cls.NEO4J_URI = os.getenv("NEO4J_URI")
+        cls.NEO4J_USERNAME = os.getenv("NEO4J_USERNAME")
+        cls.NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
         
         # Load other settings
         cls.MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", 50))

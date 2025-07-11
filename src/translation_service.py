@@ -3,7 +3,7 @@ Translation service module for multilingual document chatbot.
 Supports Google Translate API with fallback to free translation services.
 """
 
-import streamlit as st
+import gradio as gr
 from typing import Optional, Dict, Any, List
 from google.cloud import translate_v3 as translate
 import langdetect
@@ -11,6 +11,20 @@ import json
 import hashlib
 from pathlib import Path
 from src.config import Config
+
+def safe_gradio_notification(notification_type: str, message: str):
+    """Safely call Gradio notifications, only if in proper context."""
+    try:
+        if notification_type == "info":
+            gr.Info(message)
+        elif notification_type == "warning":
+            gr.Warning(message)
+        elif notification_type == "error":
+            gr.Error(message)
+    except Exception:
+        # If Gradio context is not available, just skip the notification
+        # The print statement will still work
+        pass
 
 class TranslationService:
     """Service for translating text between different languages."""
@@ -40,45 +54,49 @@ class TranslationService:
                     # Try to parse as JSON service account
                     service_account_info = json.loads(Config.GOOGLE_TRANSLATE_API_KEY)
                     self.translate_client = translate.TranslationServiceClient.from_service_account_info(service_account_info)
-                    st.success("✅ Google Cloud Translate v3 initialized with service account.")
+                    print("✅ Google Cloud Translate v3 initialized with service account.")
+                    safe_gradio_notification("info", "✅ Google Cloud Translate v3 initialized with service account.")
                 except json.JSONDecodeError:
                     # If not JSON, treat as file path
                     import os
                     if os.path.exists(Config.GOOGLE_TRANSLATE_API_KEY):
                         os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = Config.GOOGLE_TRANSLATE_API_KEY
                         self.translate_client = translate.TranslationServiceClient()
-                        st.success("✅ Google Cloud Translate v3 initialized with service account file.")
+                        print("✅ Google Cloud Translate v3 initialized with service account file.")
+                        safe_gradio_notification("info", "✅ Google Cloud Translate v3 initialized with service account file.")
                     else:
                         raise ValueError("GOOGLE_TRANSLATE_API_KEY must be either JSON content or path to service account file")
             else:
                 # Try Application Default Credentials
                 self.translate_client = translate.TranslationServiceClient()
-                st.success("✅ Google Cloud Translate v3 initialized with Application Default Credentials.")
+                print("✅ Google Cloud Translate v3 initialized with Application Default Credentials.")
+                safe_gradio_notification("info", "✅ Google Cloud Translate v3 initialized with Application Default Credentials.")
             
         except Exception as e:
-            st.error(f"❌ Could not initialize Google Cloud Translate: {e}")
-            st.info("""
-            **Translation Setup Required**
+            error_msg = f"❌ Could not initialize Google Cloud Translate: {e}"
+            print(error_msg)
+            safe_gradio_notification("error", error_msg)
+            
+            setup_info = """
+            Translation Setup Required
             
             Google Cloud Translation API v3 requires service account authentication.
             
-            **Option 1: Service Account JSON (Recommended)**
-            Put your service account JSON content in secrets.toml:
-            ```toml
-            GOOGLE_TRANSLATE_API_KEY = '{"type": "service_account", "project_id": "...", ...}'
-            GOOGLE_PROJECT_ID = "your-project-id"
-            ```
+            Option 1: Service Account File (Recommended)
+            Put the file path in .env:
+            GOOGLE_TRANSLATE_API_KEY=/path/to/service-account.json
+            GOOGLE_PROJECT_ID=your-project-id
             
-            **Option 2: Service Account File**
-            Put the file path in secrets.toml:
-            ```toml
-            GOOGLE_TRANSLATE_API_KEY = "/path/to/service-account.json"
-            GOOGLE_PROJECT_ID = "your-project-id"
-            ```
+            Option 2: Service Account JSON
+            Put your service account JSON content in .env:
+            GOOGLE_TRANSLATE_API_KEY='{"type": "service_account", "project_id": "...", ...}'
+            GOOGLE_PROJECT_ID=your-project-id
             
-            **Option 3: Application Default Credentials**
-            Run: `gcloud auth application-default login`
-            """)
+            Option 3: Application Default Credentials
+            Run: gcloud auth application-default login
+            """
+            print(setup_info)
+            safe_gradio_notification("info", "Please check the console for Google Cloud Translation setup instructions.")
     
     def _generate_cache_key(self, filename: str, text: str, target_language: str, source_language: str = 'auto') -> str:
         """Generate a unique cache key for translation."""
@@ -94,7 +112,9 @@ class TranslationService:
             with open(cache_file, 'w', encoding='utf-8') as f:
                 json.dump(translation_result, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            st.warning(f"Failed to save translation cache: {e}")
+            warning_msg = f"Failed to save translation cache: {e}"
+            print(f"Warning: {warning_msg}")
+            safe_gradio_notification("warning", warning_msg)
     
     def _load_translation_cache(self, cache_key: str) -> Optional[Dict[str, Any]]:
         """Load translation result from cache."""
@@ -104,7 +124,9 @@ class TranslationService:
                 with open(cache_file, 'r', encoding='utf-8') as f:
                     return json.load(f)
         except Exception as e:
-            st.warning(f"Failed to load translation cache: {e}")
+            warning_msg = f"Failed to load translation cache: {e}"
+            print(f"Warning: {warning_msg}")
+            safe_gradio_notification("warning", warning_msg)
         return None
     
     def detect_language(self, text: str) -> Optional[str]:
@@ -122,7 +144,9 @@ class TranslationService:
             detected = langdetect.detect(text[:1000])  # Use first 1000 chars for detection
             return detected
         except Exception as e:
-            st.warning(f"Language detection failed: {e}")
+            warning_msg = f"Language detection failed: {e}"
+            print(f"Warning: {warning_msg}")
+            safe_gradio_notification("warning", warning_msg)
             return None
     
     def translate_text(self, text: str, target_language: str, source_language: str = 'auto', filename: Optional[str] = None) -> Dict[str, Any]:
@@ -186,7 +210,9 @@ class TranslationService:
                 
                 return result
         except Exception as e:
-            st.warning(f"Google Cloud Translation failed: {e}")
+            warning_msg = f"Google Cloud Translation failed: {e}"
+            print(f"Warning: {warning_msg}")
+            safe_gradio_notification("warning", warning_msg)
             return {"success": False, "error": f"Translation failed: {e}"}
     
     def _translate_with_google_cloud(self, text: str, target_lang: str, source_lang: str) -> Dict[str, Any]:

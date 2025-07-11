@@ -1,5 +1,5 @@
 # Core Web Framework
-streamlit==1.46.1
+gradio==3.48.0
 
 # Document Processing
 PyPDF2==3.0.1
