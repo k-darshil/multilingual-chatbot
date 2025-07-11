@@ -1,6 +1,6 @@
 """
 Translation service module for multilingual document chatbot.
-Supports Google Translate API with fallback to free translation services.
+Supports Google Translate API and NLLB open-source translation.
 """
 
 import gradio as gr
@@ -11,6 +11,8 @@ import json
 import hashlib
 from pathlib import Path
 from src.config import Config
+from src.language_mapping import LanguageMapping, TranslationService as ServiceType
+from src.nllb_translation_service import NLLBTranslationService
 
 def safe_gradio_notification(notification_type: str, message: str):
     """Safely call Gradio notifications, only if in proper context."""
@@ -101,8 +103,10 @@ class TranslationService:
     def _generate_cache_key(self, filename: str, text: str, target_language: str, source_language: str = 'auto') -> str:
         """Generate a unique cache key for translation."""
         # Create a hash of the content and parameters to ensure uniqueness
-        content_hash = hashlib.md5(text.encode('utf-8')).hexdigest()
-        cache_key = f"{filename}_{content_hash}_{source_language}_{target_language}"
+        content_hash = hashlib.md5(text.encode('utf-8')).hexdigest()[:8]
+        clean_filename = Path(filename).stem
+        # Include service name to avoid conflicts with NLLB cache
+        cache_key = f"{clean_filename}__GoogleCloud__{source_language}__{target_language}__{content_hash}"
         return cache_key
     
     def _save_translation_cache(self, cache_key: str, translation_result: Dict[str, Any]) -> None:
@@ -498,4 +502,111 @@ Content Preview:
             return {
                 "success": False,
                 "error": f"Translation test failed: {e}"
-            } 
+            }
+
+
+class TranslationServiceWrapper:
+    """
+    Wrapper class that delegates to either Google Cloud or NLLB translation service
+    based on the selected service type.
+    """
+    
+    def __init__(self, service_type: Optional[ServiceType] = None):
+        self.service_type = service_type or Config.get_translation_service_enum()
+        self.google_service = None
+        self.nllb_service = None
+        
+        # Initialize the appropriate service
+        if self.service_type == ServiceType.GOOGLE_CLOUD:
+            self.google_service = TranslationService()  # Existing Google Cloud service
+        elif self.service_type == ServiceType.NLLB:
+            self.nllb_service = NLLBTranslationService(Config.NLLB_MODEL_NAME)
+        
+        print(f"🔧 Translation Service initialized with: {LanguageMapping.get_service_display_name(self.service_type)}")
+    
+    def _get_active_service(self):
+        """Get the active translation service based on service type."""
+        if self.service_type == ServiceType.GOOGLE_CLOUD:
+            return self.google_service
+        elif self.service_type == ServiceType.NLLB:
+            return self.nllb_service
+        else:
+            raise ValueError(f"Unknown service type: {self.service_type}")
+    
+    def detect_language(self, text: str) -> Optional[str]:
+        """Detect the language of the given text."""
+        service = self._get_active_service()
+        return service.detect_language(text)
+    
+    def translate_text(self, text: str, target_language: str, source_language: str = 'auto', filename: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Translate text using the selected service.
+        
+        Args:
+            text: Text to translate
+            target_language: Target language code (global)
+            source_language: Source language code (global, default: 'auto')
+            filename: Optional filename for caching
+            
+        Returns:
+            Dict with translation result, confidence, and metadata
+        """
+        service = self._get_active_service()
+        
+        # Let each service handle its own cache key generation
+        # This fixes the parameter mismatch issue between Google Cloud and NLLB services
+        return service.translate_text(text, target_language, source_language, filename)
+    
+    def get_supported_languages(self) -> Dict[str, str]:
+        """Get list of supported languages for the active service."""
+        return LanguageMapping.get_supported_languages(self.service_type)
+    
+    def is_translation_needed(self, text: str, target_language: str) -> bool:
+        """Check if translation is needed based on detected language."""
+        service = self._get_active_service()
+        return service.is_translation_needed(text, target_language)
+    
+    def get_language_name(self, language_code: str) -> str:
+        """Get full language name from language code."""
+        return LanguageMapping.get_language_name(language_code)
+    
+    def validate_language_code(self, language_code: str) -> bool:
+        """Validate if language code is supported by the active service."""
+        return LanguageMapping.is_language_supported(language_code, self.service_type)
+    
+    def switch_service(self, new_service_type: ServiceType):
+        """Switch to a different translation service."""
+        if new_service_type != self.service_type:
+            self.service_type = new_service_type
+            
+            # Initialize new service if needed
+            if new_service_type == ServiceType.GOOGLE_CLOUD and self.google_service is None:
+                self.google_service = TranslationService()
+            elif new_service_type == ServiceType.NLLB and self.nllb_service is None:
+                self.nllb_service = NLLBTranslationService(Config.NLLB_MODEL_NAME)
+            
+            print(f"🔄 Switched to: {LanguageMapping.get_service_display_name(self.service_type)}")
+    
+    def get_service_info(self) -> Dict[str, Any]:
+        """Get information about the active service."""
+        service_info = {
+            "active_service": LanguageMapping.get_service_display_name(self.service_type),
+            "service_type": self.service_type.value,
+            "supported_languages": len(self.get_supported_languages())
+        }
+        
+        # Add service-specific info
+        if self.service_type == ServiceType.GOOGLE_CLOUD and self.google_service:
+            service_info["google_cloud_configured"] = bool(self.google_service.translate_client)
+            service_info["project_id"] = self.google_service.project_id
+        elif self.service_type == ServiceType.NLLB and self.nllb_service:
+            model_info = self.nllb_service.get_model_info()
+            service_info.update(model_info)
+        
+        return service_info
+
+
+# Maintain backward compatibility by creating a default wrapper instance
+def create_translation_service(service_type: Optional[ServiceType] = None) -> TranslationServiceWrapper:
+    """Factory function to create a translation service wrapper."""
+    return TranslationServiceWrapper(service_type) 

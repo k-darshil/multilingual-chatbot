@@ -17,19 +17,21 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
 from src.config import Config
 from src.document_processor import DocumentProcessor
-from src.translation_service import TranslationService
+from src.translation_service import TranslationServiceWrapper, create_translation_service
+from src.language_mapping import LanguageMapping, TranslationService as ServiceType
 from src.rag_system import RAGSystem
 
 # Global state for maintaining session
 class AppState:
     def __init__(self):
         self.document_processor = DocumentProcessor()
-        self.translation_service = TranslationService()
+        self.translation_service = create_translation_service()  # Use wrapper
         self.rag_system = RAGSystem()
         self.chat_history: List[Tuple[str, str]] = []
         self.current_document: Optional[Dict[str, Any]] = None
         self.document_indexed: bool = False
         self.selected_language: str = "en"
+        self.selected_service: str = "google_cloud"  # Default service
 
 # Initialize global state
 app_state = AppState()
@@ -43,14 +45,70 @@ def validate_configuration():
         return False, error_msg
     return True, "✅ Configuration is valid"
 
-def get_language_options():
-    """Get language options for dropdown."""
-    language_options = Config.get_language_options()
+def get_language_options(service_type: str = None):
+    """Get language options for dropdown based on selected service."""
+    if service_type is None:
+        service_type = app_state.selected_service
+    
+    language_options = Config.get_language_options(service_type)
     return [name for code, name in language_options]
 
-def update_language(language_name: str) -> str:
+def get_translation_service_options():
+    """Get translation service options for radio buttons."""
+    return Config.get_translation_service_options()
+
+def update_translation_service(service_choice: str) -> Tuple[Dict, str, str]:
+    """Update selected translation service and return updated language options."""
+    app_state.selected_service = service_choice
+    
+    # Switch the translation service
+    if service_choice == "google_cloud":
+        service_type = ServiceType.GOOGLE_CLOUD
+    elif service_choice == "nllb":
+        service_type = ServiceType.NLLB
+    else:
+        service_type = ServiceType.GOOGLE_CLOUD
+    
+    app_state.translation_service.switch_service(service_type)
+    
+    # Get updated language options
+    new_language_options = get_language_options(service_choice)
+    
+    # Reset to first available language if current language not supported
+    current_lang_name = LanguageMapping.get_language_name(app_state.selected_language)
+    if current_lang_name not in new_language_options and new_language_options:
+        # Set to first available language
+        first_lang_name = new_language_options[0]
+        language_map = {name: code for code, name in Config.get_language_options(service_choice)}
+        app_state.selected_language = language_map.get(first_lang_name, "en")
+        current_lang_name = LanguageMapping.get_language_name(app_state.selected_language)
+    
+    service_display_name = LanguageMapping.get_service_display_name(service_type)
+    status_msg = f"🔄 Switched to: {service_display_name}"
+    language_status = f"Language set to: {current_lang_name}"
+    
+    # Return updated dropdown using gr.update
+    updated_dropdown = gr.update(
+        choices=new_language_options,
+        value=current_lang_name
+    )
+    
+    return updated_dropdown, status_msg, language_status
+
+def update_language(language_name) -> str:
     """Update selected language."""
-    language_map = {name: code for code, name in Config.get_language_options()}
+    # Handle case where language_name might be a list (Gradio bug)
+    if isinstance(language_name, list):
+        if language_name:
+            language_name = language_name[0]
+        else:
+            language_name = "English"
+    
+    # Ensure we have a string
+    if not isinstance(language_name, str):
+        language_name = "English"
+    
+    language_map = {name: code for code, name in Config.get_language_options(app_state.selected_service)}
     app_state.selected_language = language_map.get(language_name, "en")
     return f"Language set to: {language_name}"
 
@@ -278,16 +336,39 @@ def create_interface():
         if not config_valid:
             gr.HTML(f'<div style="background-color: #ffebee; padding: 1rem; border-radius: 8px; border: 1px solid #f44336; margin: 1rem 0; color: #c62828;">{config_msg}</div>')
         
+        # Main content area
         with gr.Row():
             # Left column - Document upload and settings
             with gr.Column(scale=1):
                 gr.HTML('<h3>⚙️ Settings & Document Upload</h3>')
                 
+                # Translation service selection
+                gr.HTML('<h4>🔧 Translation Service</h4>')
+                service_options = get_translation_service_options()
+                service_radio = gr.Radio(
+                    choices=[display_name for value, display_name in service_options],
+                    value="Google Cloud Translate",  # Default
+                    label="Select Translation Service",
+                    info="Choose between Google Cloud (API key required) or NLLB (open-source, runs locally)"
+                )
+                
+                service_status = gr.Textbox(
+                    value="🔧 Translation Service initialized with: Google Cloud Translate",
+                    label="Service Status",
+                    interactive=False,
+                    lines=2
+                )
+                
                 # Language selection
+                gr.HTML('<h4>🌍 Language Settings</h4>')
+                initial_language_options = get_language_options()
+                initial_language_value = "English" if "English" in initial_language_options else (initial_language_options[0] if initial_language_options else "English")
+                
                 language_dropdown = gr.Dropdown(
-                    choices=get_language_options(),
-                    value="English",
-                    label="🌍 Response Language"
+                    choices=initial_language_options,
+                    value=initial_language_value,
+                    label="Response Language",
+                    info="Questions and answers will be in this language"
                 )
                 
                 language_status = gr.Textbox(
@@ -346,6 +427,16 @@ def create_interface():
                 submit_btn = gr.Button("Send", variant="primary")
                 
         # Event handlers
+        # Service selection handler
+        service_radio.change(
+            fn=lambda service_display_name: update_translation_service(
+                # Convert display name back to service value
+                next(value for value, display in service_options if display == service_display_name)
+            ),
+            inputs=[service_radio],
+            outputs=[language_dropdown, service_status, language_status]
+        )
+        
         language_dropdown.change(
             fn=update_language,
             inputs=[language_dropdown],
